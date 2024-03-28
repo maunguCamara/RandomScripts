@@ -25,14 +25,15 @@ import serial
 import time
 
 #Intialize serial communication with arduino
-ser = serial.Serial('\\.\COM12', 9600)
+ser = serial.Serial('COM12', 9600)
 time.sleep(2)
+ser.close()
 #Initialize serial communication wiith sim900 gsm module
-sim900 = serial.Serial('\\.\COM12', 9600)
+sim900 = serial.Serial('COM12', 9600)
 time.sleep(2)
-
+sim900.close()
 #path to images folder 
-path = "C:/Users/ADMIN/Downloads"
+path = "C:/Users/ADMIN/Downloads/cleared"
 #url =  "arduino serial monitor"
 
 
@@ -93,15 +94,21 @@ def blinkLED(color, duration):
     ser.write('OFF'.encode()) #Turn off LED
 
 
-def sendSMS(phoneNumber, message):
-    sim900.println("AT+CMGF=1")  # Set SMS mode to text mode
-    time.sleep(0.1)
-    sim900.println(f'AT+CMGS="{phoneNumber}"')  # Set recipient phone number
-    time.sleep(0.1)
-    sim900.write(message.encode('utf-8'))  # Encode message to bytes and send
-    time.sleep(0.1)
-    sim900.write(bytes([26]))  # ASCII code for Ctrl+Z (end of message)
-    time.sleep(0.1)
+def sendSMS(sim900, phoneNumber, message):
+
+    sim900.open()
+    sim900.write(b'AT+CMGF=1\r\n')
+    time.sleep(1)
+
+    sim900.write(f'AT+CMGS="{phoneNumber}"\r\n'.encode('utf-8'))
+    time.sleep(1)
+
+    sim900.write(message.encode('utf-8'))
+    time.sleep(1)
+
+    sim900.write(bytes([26]))
+    time.sleep(1)
+    sim900.close()
 
 #Match face on camera with face in folder, start the webcam, to terminate program press q
 #Increase accuracy by adding toleracne 
@@ -120,24 +127,24 @@ while True:
         
         if np.any(faceDis > 0.6) or not any(matches):
             print("You do not appear in the exam list")
-            blinkLED("RED", 0.5) #Blink red LED for .5 seconds
-            sendSMS("+254703678264", "Unauthorized face detected!")
+            #blinkLED("RED", 0.5) #Blink red LED for .5 seconds
+            sendSMS(sim900, "+254703678264", "Unauthorized face detected!")
             
         else:
             name = studentNames[matchIndex].upper()
             if name in authorizedStudents:
                 print(f'{name} has already checked in.')
-                sendSMS("+254703678264",f'{name} has already checked in')
+                sendSMS(sim900, "+254703678264",f'{name} has already checked in')
                 
 
-                blinkLED("RED", 0.5)# BLink red LED for 0.5 seconds
+                #blinkLED("RED", 0.5)# BLink red LED for 0.5 seconds
             else:
-                print(f'{name} appears on the exam list')
+                canSit = f'{name} appears on the exam list'
                 authorizedStudents[name] = datetime.now().strftime('%H:%M:%S')
                 #send sms notification
-                sendSMS("+254703678264", f'{name} appears on the exam list. Checked in')
+                sendSMS(sim900, "+254703678264", canSit)
                 
-                blinkLED("GREEN", 0.5) #BLink green LED for .5 seconds
+                #blinkLED("GREEN", 0.5) #BLink green LED for .5 seconds
         
 
     cv2.imshow('Webcam', img)
