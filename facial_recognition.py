@@ -23,7 +23,7 @@ from datetime import datetime
 import face_recognition
 import serial
 import time
-
+from pyfirmata import Arduino, util
 #Intialize serial communication with arduino
 ser = serial.Serial('COM12', 9600)
 time.sleep(2)
@@ -89,25 +89,36 @@ authorizedStudents = {}
 
 
 def blinkLED(color, duration):
+    ser.open()
     ser.write(color.encode()) # send color to Arduino to control LED
-    time.sleep(duration)
+    time.sleep(0.1)
     ser.write('OFF'.encode()) #Turn off LED
+    ser.close()
 
+
+
+def triggerSMS(message):
+    ser.open()
+    ser.write(message.encode())
+    time.sleep(0.1)
+    ser.close()
+    print("SMS sent succesfully")     
 
 def sendSMS(sim900, phoneNumber, message):
 
     sim900.open()
     sim900.write(b'AT+CMGF=1\r\n')
-    time.sleep(1)
+    time.sleep(0.1)
 
     sim900.write(f'AT+CMGS="{phoneNumber}"\r\n'.encode('utf-8'))
-    time.sleep(1)
+    time.sleep(0.1)
 
     sim900.write(message.encode('utf-8'))
-    time.sleep(1)
+    time.sleep(0.1)
 
     sim900.write(bytes([26]))
-    time.sleep(1)
+    time.sleep(0.1)
+    print("SMS sent succesfully")
     sim900.close()
 
 #Match face on camera with face in folder, start the webcam, to terminate program press q
@@ -126,25 +137,23 @@ while True:
         matchIndex = np.argmin(faceDis)
         
         if np.any(faceDis > 0.6) or not any(matches):
-            print("You do not appear in the exam list")
-            #blinkLED("RED", 0.5) #Blink red LED for .5 seconds
-            sendSMS(sim900, "+254703678264", "Unauthorized face detected!")
+           noExam = "UNAUTHORIZED.You do not appear in the exam list"
+           blinkLED("RED", 0.5) #Blink red LED for .5 seconds
+           triggerSMS(noExam)
             
         else:
             name = studentNames[matchIndex].upper()
             if name in authorizedStudents:
-                print(f'{name} has already checked in.')
-                sendSMS(sim900, "+254703678264",f'{name} has already checked in')
-                
-
-                #blinkLED("RED", 0.5)# BLink red LED for 0.5 seconds
+                checkedIn = f'CHECKEDIN.{name} has already checked in.'
+                triggerSMS(checkedIn)
+                blinkLED("RED", 0.5)# BLink red LED for 0.5 seconds
             else:
-                canSit = f'{name} appears on the exam list'
+                canSit = f'AUTHORIZED.{name} appears on the exam list'
                 authorizedStudents[name] = datetime.now().strftime('%H:%M:%S')
                 #send sms notification
-                sendSMS(sim900, "+254703678264", canSit)
-                
-                #blinkLED("GREEN", 0.5) #BLink green LED for .5 seconds
+                #sendSMS(sim900, "+254703678264", canSit)     
+                blinkLED("GREEN", 0.5) #BLink green LED for .5 
+                triggerSMS(canSit)
         
 
     cv2.imshow('Webcam', img)
